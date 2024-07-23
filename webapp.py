@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.optimize import LinearConstraint
+import io
 
 def get_bounds(row):
     lower = 0 if np.isnan(row["LowerBound"]) else row["LowerBound"]
@@ -29,17 +30,32 @@ def main():
 
     st.write("""
     # Production Optimization App
-    "Optimize your production plan by allocating your budget to maximize profits."
-             
+    "Optimize your production plan by allocating your budget to maximize profits."         
     """)
     
-    #uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
-    uploaded_file = pd.read_csv("sample_data.csv")
+    st.sidebar.header('User Input Features')
+
+    # Sample data
+    sample_data = pd.read_csv("sample_data.csv", encoding='utf-8')
+    # Save sample data to a BytesIO object
+    buffer = io.BytesIO()
+    sample_data.to_csv(buffer, index=False, encoding='utf-8')
+    buffer.seek(0)
+    # Sidebar download button for the sample file
+    st.sidebar.download_button(
+        label="Download Sample Input File",
+        data= buffer.getvalue(),
+        file_name="sample_input.csv",
+        mime="text/csv"
+    )
+
+    uploaded_file = st.sidebar.file_uploader("Upload your CSV file", type=["csv"])
+
     if uploaded_file is not None:
-        #products = pd.read_csv(uploaded_file)
-        products = uploaded_file
+
+        products = pd.read_csv(uploaded_file)
         
-        budget = st.number_input("Enter your budget(Rial)")
+        budget = st.sidebar.number_input("Enter your budget(Rial)")
 
         solver = 'trust-constr'
         
@@ -52,17 +68,33 @@ def main():
                             bounds=problem.bounds,
                             method=solver, options={"maxiter": 100000000, "disp": True})
         
+        # Example computation and handling default value
+        computed_value = problem.gain(np.floor(solution.x)) if solution.success else None
+
+        # Set a default value
+        default_value = 0.0
+
+        # Display with default value if computed_value is None
         st.write(f"Budget: {problem.budget}")
-        st.write(f"Maximum Profit: {problem.gain(solution.x.round()):.3f}")
-        st.write(f"Remaining Budget: {problem.budget_constraint(solution.x.round()):.3f}")
-        
-        products["ProductionPlan"] = solution.x.round()
+        st.write(f"Maximum Profit: {problem.gain(np.floor(solution.x)):.3f}" if problem.budget!= 0.0 else f"Maximum Profit: {default_value:.3f}")   
+        st.write(f"Remaining Budget: {problem.budget_constraint(np.floor(solution.x)):.3f}" if problem.budget!= 0.0 else f"Remaining Budget: {default_value:.3f}")
+    
+        # Conditional assignment for ProductionPlan
+        if problem.budget != 0.0:
+            products['ProductionPlan'] = np.floor(solution.x)
+        else:
+            products['ProductionPlan'] = default_value
+
+
+
+
         # Drop 'LowerBound' and 'UpperBound' columns
         products = products.drop(columns=['LowerBound', 'UpperBound'])
 
         st.write("""
         ##### Production Plan Overview
         """)
+
         st.dataframe(products)
 
 
@@ -71,6 +103,23 @@ def main():
         #     data=products.to_excel("result.xlsx",index=False, engine='openpyxl'),
 
         # )
+        # Save sample data to a BytesIO object as Excel
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            products.to_excel(writer, index=False, sheet_name='Sheet1')
+        buffer.seek(0)
+
+        # Sidebar download button for the sample file
+        st.download_button(
+            label="Download Production Plan",
+            data=buffer,
+            file_name="result.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+
+    else :
+        st.write("Awaiting CSV file to be uploaded.")
 
 
 if __name__ == "__main__":
