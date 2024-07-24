@@ -53,6 +53,14 @@ class OptimizationProblem:
         # Check the result
         if status == pywraplp.Solver.OPTIMAL:
             result = {
+                "Solution Type": "Optimal",
+                'objective_value': solver.Objective().Value(),
+                "constraint":self.budget_constraint(np.array([x[i].solution_value() for i in range(num_products)])),
+                'quantities': [x[i].solution_value() for i in range(num_products)]
+            }
+        elif status == pywraplp.Solver.FEASIBLE:
+            result = {
+                "Solution Type": "Feasible",
                 'objective_value': solver.Objective().Value(),
                 "constraint":self.budget_constraint(np.array([x[i].solution_value() for i in range(num_products)])),
                 'quantities': [x[i].solution_value() for i in range(num_products)]
