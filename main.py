@@ -1,8 +1,7 @@
-import numpy as np 
 import pandas as pd
-from scipy.optimize import minimize
-from scipy.optimize import LinearConstraint
-from scipy.optimize import minimize
+import numpy as np
+from ortools.init.python import init
+from ortools.linear_solver import pywraplp
 
 
 def get_bounds(row:pd.DataFrame):
@@ -24,32 +23,50 @@ class OptimizationProblem:
 
     def objective(self, x):
         return -self.gain(x)
+    
     def budget_constraint(self,x):
         return self.budget - np.sum(self.cost*x)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    def solve(self):
+    # Create the solver
+        solver = pywraplp.Solver.CreateSolver('SCIP')
+        if not solver:
+            return None
+        
+        # Number of products
+        num_products = len(self.products)
+        
+        # Variables: integer quantities for each product
+        x = []
+        for i in range(num_products):
+            lower_bound, upper_bound = self.bounds[i]
+            x.append(solver.IntVar(lower_bound, upper_bound, f'x_{i}'))
+        
+        # Objective function: maximize gain
+        solver.Maximize(solver.Sum(self.benefit[i] * x[i] for i in range(num_products)))
+        
+        # Budget constraint: sum(cost * x) <= budget
+        solver.Add(solver.Sum(self.cost[i] * x[i] for i in range(num_products)) <= self.budget)
+        
+        # Solve the problem
+        status = solver.Solve()
+        
+        # Check the result
+        if status == pywraplp.Solver.OPTIMAL:
+            result = {
+                'objective_value': solver.Objective().Value(),
+                "constraint":self.budget_constraint(np.array([x[i].solution_value() for i in range(num_products)])),
+                'quantities': [x[i].solution_value() for i in range(num_products)]
+            }
+            return result
+        else:
+            return None
+        
+        
 products = pd.read_csv("sample_data.csv")
 
-budget = 100000000000
-solver = 'trust-constr'
-
+budget = 1000000
 problem = OptimizationProblem(products, budget)
 
-constraints = LinearConstraint(problem.cost,lb=0,ub=problem.budget)
-solution = minimize(problem.objective,
-                    x0= np.zeros(len(problem.products)),
-                    constraints=constraints,
-                    bounds=problem.bounds, 
-                    method=solver,options={"maxiter":100000000, "disp":True})
-print(f"{problem.budget}, {solver}: {problem.gain(solution.x.round())}, {problem.budget_constraint(solution.x.round())}")
-products["ProductionPlan"] = solution.x.round()
-products.to_excel("products.xlsx", index=False)
+solution = problem.solve()
+print(solution["objective_value"])
+result= pd.concat([products,pd.DataFrame({"optimal_quantity": solution["quantities"]})],axis=1)
