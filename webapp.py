@@ -4,6 +4,8 @@ import pandas as pd
 from scipy.optimize import minimize
 from scipy.optimize import LinearConstraint
 import io
+from ortools.init.python import init
+from ortools.linear_solver import pywraplp
 
 def get_bounds(row):
     lower = 0 if np.isnan(row["LowerBound"]) else row["LowerBound"]
@@ -26,6 +28,48 @@ class OptimizationProblem:
     def budget_constraint(self, x):
         return self.budget - np.sum(self.cost * x)
 
+
+    def solve(self):
+    # Create the solver
+        solver = pywraplp.Solver.CreateSolver('SCIP')
+        if not solver:
+            return None
+        
+        # Number of products
+        num_products = len(self.products)
+        
+        # Variables: integer quantities for each product
+        x = []
+        for i in range(num_products):
+            lower_bound, upper_bound = self.bounds[i]
+            x.append(solver.IntVar(lower_bound, upper_bound, f'x_{i}'))
+        
+        # Objective function: maximize gain
+        solver.Maximize(solver.Sum(self.benefit[i] * x[i] for i in range(num_products)))
+        
+        # Budget constraint: sum(cost * x) <= budget
+        solver.Add(solver.Sum(self.cost[i] * x[i] for i in range(num_products)) <= self.budget)
+        
+        # Solve the problem
+        status = solver.Solve()
+        
+        # Check the result
+        if status == pywraplp.Solver.OPTIMAL:
+            optimal_quantities = [x[i].solution_value() for i in range(num_products)]
+            used_budget = np.sum(self.cost * np.array(optimal_quantities))
+            remaining_budget = self.budget - used_budget
+            max_profit = self.gain(np.array(optimal_quantities))
+            result = {
+                'objective_value': solver.Objective().Value(),
+                'remaining_budget': remaining_budget,
+                'max_profit': max_profit,
+                'quantities':  optimal_quantities
+
+            }
+            return result
+        else:
+            return None
+        
 def main():
 
     st.write("""
@@ -55,61 +99,60 @@ def main():
 
         products = pd.read_csv(uploaded_file)
         
-        budget = st.sidebar.number_input("Enter your budget(Rial)")
+        budget = st.sidebar.number_input("Enter your budget(Rial)", min_value=0, value= 0)
 
-        solver = 'trust-constr'
+        # solver = 'trust-constr'
         
         problem = OptimizationProblem(products, budget)
 
-        constraints = LinearConstraint(problem.cost, lb=0, ub=problem.budget)
-        solution = minimize(problem.objective,
-                            x0=np.zeros(len(problem.products)),
-                            constraints=constraints,
-                            bounds=problem.bounds,
-                            method=solver, options={"maxiter": 100000000, "disp": True})
+        # constraints = LinearConstraint(problem.cost, lb=0, ub=problem.budget)
+        # solution = minimize(problem.objective,
+        #                     x0=np.zeros(len(problem.products)),
+        #                     constraints=constraints,
+        #                     bounds=problem.bounds,
+        #                     method=solver, options={"maxiter": 100000000, "disp": True})
         
-        # Example computation and handling default value
-        computed_value = problem.gain(np.floor(solution.x)) if solution.success else None
+        solution = problem.solve()
+
+
+        if solution:
+            st.write(f"Remaining Budget: {solution['remaining_budget'] * 1000 :,.0f} Toman")
+            st.write(f"Maximum Profit: {solution['max_profit'] * 1000 :,.0f} Toman")
+            products['optimal_quantity'] = solution['quantities']
+            st.write("Here are the optimal quantities for each product:")
+            st.write(products)
+        else:
+            st.write("No optimal solution found.")
+
+        # result= pd.concat([products,pd.DataFrame({"optimal_quantity": solution["quantities"]})],axis=1)
 
         # Set a default value
-        default_value = 0.0
+        # default_value = 0.0
+        # # Display with default value if budget = 0
+        # st.write(f"Budget: {problem.budget}")
+        # st.write(f"Maximum Profit: {problem.gain(np.floor(solution.x)):.3f}" if problem.budget!= 0.0 else f"Maximum Profit: {default_value:.3f}")   
+        # st.write(f"Remaining Budget: {problem.budget_constraint(np.floor(solution.x)):.3f}" if problem.budget!= 0.0 else f"Remaining Budget: {default_value:.3f}")
+        # if problem.budget != 0.0:
+        #     products['ProductionPlan'] = np.floor(solution.x)
+        # else:
+        #     products['ProductionPlan'] = default_value
 
-        # Display with default value if computed_value is None
-        st.write(f"Budget: {problem.budget}")
-        st.write(f"Maximum Profit: {problem.gain(np.floor(solution.x)):.3f}" if problem.budget!= 0.0 else f"Maximum Profit: {default_value:.3f}")   
-        st.write(f"Remaining Budget: {problem.budget_constraint(np.floor(solution.x)):.3f}" if problem.budget!= 0.0 else f"Remaining Budget: {default_value:.3f}")
-    
-        # Conditional assignment for ProductionPlan
-        if problem.budget != 0.0:
-            products['ProductionPlan'] = np.floor(solution.x)
-        else:
-            products['ProductionPlan'] = default_value
+        # # Drop 'LowerBound' and 'UpperBound' columns
+        # products = products.drop(columns=['LowerBound', 'UpperBound'])
 
+        # st.write("""
+        # ##### Production Plan Overview
+        # """)
 
-
-
-        # Drop 'LowerBound' and 'UpperBound' columns
-        products = products.drop(columns=['LowerBound', 'UpperBound'])
-
-        st.write("""
-        ##### Production Plan Overview
-        """)
-
-        st.dataframe(products)
-
-
-        # st.download_button(
-        #     label="Download Production Plan",
-        #     data=products.to_excel("result.xlsx",index=False, engine='openpyxl'),
-
-        # )
-        # Save sample data to a BytesIO object as Excel
+        # st.dataframe(products)
+        # st.dataframe(result)
+        # Save result to a BytesIO object as Excel
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             products.to_excel(writer, index=False, sheet_name='Sheet1')
         buffer.seek(0)
 
-        # Sidebar download button for the sample file
+        # Download button for the result
         st.download_button(
             label="Download Production Plan",
             data=buffer,
