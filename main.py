@@ -58,6 +58,7 @@ class OptimizationProblem:
                 "constraint":self.budget_constraint(np.array([x[i].solution_value() for i in range(num_products)])),
                 'quantities': [x[i].solution_value() for i in range(num_products)]
             }
+            return result
         elif status == pywraplp.Solver.FEASIBLE:
             result = {
                 "Solution Type": "Feasible",
