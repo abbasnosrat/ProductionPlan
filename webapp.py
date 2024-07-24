@@ -100,52 +100,26 @@ def main():
         products = pd.read_csv(uploaded_file)
         
         budget = st.sidebar.number_input("Enter your budget(Rial)", min_value=0, value= 0)
-
-        # solver = 'trust-constr'
         
         problem = OptimizationProblem(products, budget)
-
-        # constraints = LinearConstraint(problem.cost, lb=0, ub=problem.budget)
-        # solution = minimize(problem.objective,
-        #                     x0=np.zeros(len(problem.products)),
-        #                     constraints=constraints,
-        #                     bounds=problem.bounds,
-        #                     method=solver, options={"maxiter": 100000000, "disp": True})
         
         solution = problem.solve()
 
 
         if solution:
+            initial_budget_divided = budget / 10
+            max_profit = solution['max_profit'] * 1000
+            profit_percentage = (max_profit / initial_budget_divided) * 100
+            st.write(f"Initial Budget: {initial_budget_divided:,.0f} Toman")
             st.write(f"Remaining Budget: {solution['remaining_budget'] * 1000 :,.0f} Toman")
-            st.write(f"Maximum Profit: {solution['max_profit'] * 1000 :,.0f} Toman")
+            st.write(f"Total Profit: {max_profit:,.0f} Toman")
+            st.write(f"Profit as Percentage of Budget: {profit_percentage:.2f}%")
             products['optimal_quantity'] = solution['quantities']
             st.write("Here are the optimal quantities for each product:")
             st.write(products)
         else:
             st.write("No optimal solution found.")
 
-        # result= pd.concat([products,pd.DataFrame({"optimal_quantity": solution["quantities"]})],axis=1)
-
-        # Set a default value
-        # default_value = 0.0
-        # # Display with default value if budget = 0
-        # st.write(f"Budget: {problem.budget}")
-        # st.write(f"Maximum Profit: {problem.gain(np.floor(solution.x)):.3f}" if problem.budget!= 0.0 else f"Maximum Profit: {default_value:.3f}")   
-        # st.write(f"Remaining Budget: {problem.budget_constraint(np.floor(solution.x)):.3f}" if problem.budget!= 0.0 else f"Remaining Budget: {default_value:.3f}")
-        # if problem.budget != 0.0:
-        #     products['ProductionPlan'] = np.floor(solution.x)
-        # else:
-        #     products['ProductionPlan'] = default_value
-
-        # # Drop 'LowerBound' and 'UpperBound' columns
-        # products = products.drop(columns=['LowerBound', 'UpperBound'])
-
-        # st.write("""
-        # ##### Production Plan Overview
-        # """)
-
-        # st.dataframe(products)
-        # st.dataframe(result)
         # Save result to a BytesIO object as Excel
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
