@@ -70,12 +70,12 @@ class OptimizationProblem:
         else:
             return None
         
-        
-products = pd.read_csv("sample_data.csv")
+if __name__ == "__main__":
+    products = pd.read_csv("sample_data.csv")
 
-budget = 1000000
-problem = OptimizationProblem(products, budget)
+    budget = 1000000
+    problem = OptimizationProblem(products, budget)
 
-solution = problem.solve()
-print(solution["objective_value"])
-result= pd.concat([products,pd.DataFrame({"optimal_quantity": solution["quantities"]})],axis=1)
+    solution = problem.solve()
+    print(solution["objective_value"])
+    result= pd.concat([products,pd.DataFrame({"optimal_quantity": solution["quantities"]})],axis=1)
