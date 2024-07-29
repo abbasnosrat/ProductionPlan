@@ -28,9 +28,9 @@ if got_data:
 
     solution = problem.solve()
     st.write(f'The algorithm found the {solution["Solution Type"]} solution')
-    st.write(f'Your profit amount with this plan is {solution["objective_value"]:.2f} tomans')
-    st.write(f'Your profit is {solution["objective_value"]/problem.budget:.2f}% of the budget')
-    st.write(f'Your remaining budget is {solution["constraint"]:.2f} tomans')
+    st.write(f'Your profit amount with this plan is {solution["objective_value"]*1000:,.2f} tomans')
+    st.write(f'Your profit is {solution["objective_value"]/problem.budget:,.2f}% of the budget')
+    st.write(f'Your remaining budget is {solution["constraint"]*1000:,.2f} tomans')
     result= pd.concat([products,pd.DataFrame({"optimal_quantity": solution["quantities"]})],axis=1)
     nas = result.isna().mean().to_numpy()
     na_cols = list(result.columns[nas == 1])
