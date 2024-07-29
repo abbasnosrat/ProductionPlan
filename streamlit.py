@@ -27,6 +27,7 @@ if got_data:
     problem = OptimizationProblem(products, budget)
 
     solution = problem.solve()
+    st.write(f"Your initial budget is {problem.budget*1000:,.2f} tomans")
     st.write(f'The algorithm found the {solution["Solution Type"]} solution')
     st.write(f'Your profit amount with this plan is {solution["objective_value"]*1000:,.2f} tomans')
     st.write(f'Your profit is {solution["objective_value"]/problem.budget:,.2f}% of the budget')
