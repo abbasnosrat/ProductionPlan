@@ -1,0 +1,4 @@
+fastapi==0.111.1
+numpy==1.24.3
+ortools==9.10.4067
+pandas==2.2.2
