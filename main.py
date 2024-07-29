@@ -79,3 +79,6 @@ if __name__ == "__main__":
     solution = problem.solve()
     print(solution["objective_value"])
     result= pd.concat([products,pd.DataFrame({"optimal_quantity": solution["quantities"]})],axis=1)
+    nas = result.isna().mean().to_numpy()
+    print(result.columns[nas == 1])
+    
